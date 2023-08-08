@@ -8,7 +8,7 @@ import { io } from "socket.io-client";
 
 
 // https://livevideoapp.onrender.com
-const socket = io("http://localhost:7777");
+const socket = io("https://livevideoapp.onrender.com");
 
 
 function Main({ myPeer}) {

@@ -3,7 +3,7 @@ import Main from './components/Main';
 import { Peer } from "peerjs";
 import "./App.css" 
 const App = () => {
-const myPeer = new Peer({ port: 4003, path: "/", host: "localhost" });
+const myPeer = new Peer();
   return (
     <>
       <Main myPeer={myPeer}/>
