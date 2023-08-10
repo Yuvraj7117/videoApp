@@ -6,7 +6,7 @@ import {
   BsMicFill,
   BsCameraVideo,
   BsCameraVideoOff,
-  BsTruckFlatbed,
+  // BsTruckFlatbed,
 } from "react-icons/bs";
 import { MdCallEnd } from "react-icons/md";
 const Video = ({
@@ -20,14 +20,89 @@ const Video = ({
   audioONOFF,
   videoONOFF,
   myVideo,
-  callEnd,
+  callEndFun,
   remoteHeader,
-  currentUserName
+  currentUserName,
+  streamVideo,
+  socket,
+  myPeer,
+  setVideoStreamArray,
+  peers,
+  setPeers,
+  setPeerListAnsArray,
+  connectionRef,
+  toggleAudVid,
+  peerInfo,
+  info,
+  currentPeerConnection,
 }) => {
   useEffect(() => {
-    myVideo.current.srcObject = currentStream;
-  }, []);
+    // console.log(streamVideo)
+    myVideo.current.srcObject = streamVideo;
 
+    socket.on("joined", (data) => {
+      const { peerId, name, roomId, video, audio } = data;
+      console.log(peerId);
+      // setFirstUser(name);
+      // setOtherName([...otherName, name]);
+
+      // setPeersId(peerId);
+      console.log(streamVideo);
+      const call = myPeer.call(peerId, streamVideo, {
+        metadata: { userName: info.name, audio: audio, video: video },
+      });
+
+      currentPeerConnection.current.push(call.peerConnection);
+
+      let peersList = JSON.parse(JSON.stringify(peers));
+      call.on("stream", (remoteStream) => {
+        console.log(remoteStream);
+        if (!peersList.includes(peerId)) {
+          peersList.push(peerId);
+          setPeers(peersList);
+
+          // setStreamId(remoteStream.id);
+          // setRoom(call.id);
+          setVideoStreamArray((prev) => [
+            ...prev,
+            { remoteStream, name, audio, video, peerID: peerId },
+          ]);
+          // setNameArr((prev) => [...prev, call.metadata.userName]);
+          connectionRef.current = myPeer;
+        }
+      });
+
+      // getStreamRef.current = streamVideo;
+      // socket.emit("stopVideo", { peerId, roomId})
+    });
+
+    myPeer.on("call", (call) => {
+      call.answer(streamVideo);
+      let peersList = JSON.parse(JSON.stringify(peers));
+      call.on("stream", (remoteStream) => {
+        if (!peersList.includes(call.peer)) {
+          peersList.push(call.peer);
+          setPeers(peersList);
+          setPeerListAnsArray((prev) => [...prev, call.peerConnection]);
+          setVideoStreamArray((prev) => [
+            ...prev,
+            {
+              remoteStream,
+              name: call.metadata.userName,
+              audio: call.metadata.audio,
+              video: call.metadata.video,
+              peerID: call.peer,
+            },
+          ]);
+          // setNameArr((prev) => [...prev, call.metadata.userName]);
+          connectionRef.current = myPeer;
+                currentPeerConnection.current.push(call.peerConnection);
+
+          //  console.log(remoteStream);
+        }
+      });
+    });
+  }, [streamVideo]);
 
   // const [userName,setUserName] = useState()
   const remoteicon = (name) => {
@@ -38,18 +113,15 @@ const Video = ({
     }
   };
 
-//   useEffect(() => {
-//     setUserName(currentName)
-//   },[])
-//  console.log(userName)
-  const currenticon = () => {
-    if (currentName[0]) {
-      return currentName[0].slice(0, 1);
+  const currenticon = (name) => {
+    if (name) {
+      return name.slice(0, 1);
     } else {
       return;
     }
   };
 
+  console.log(videoStreamArray);
   return (
     <div className=" container-fluid d-flex ">
       {/* <p ref={statusRef}></p> */}
@@ -57,8 +129,8 @@ const Video = ({
         <div className={`col-3 my-3`}>
           <div className="card ">
             <div className="card-header">
-              {currentName ? (
-                <span>{`You: ${currentName}`}</span>
+              {peerInfo.name ? (
+                <span>{`You: ${peerInfo.name}`}</span>
               ) : (
                 <span>You:</span>
               )}
@@ -71,7 +143,7 @@ const Video = ({
                     padding: "0px",
                   }}
                 >
-                  {!screen && (
+                  {!toggleAudVid.video && (
                     <span
                       style={{
                         display: "flex",
@@ -87,14 +159,14 @@ const Video = ({
                         color: "white",
                       }}
                     >
-                      {currenticon()}
+                      {currenticon(peerInfo.name)}
                     </span>
                   )}
 
                   <video
                     className="w-100"
                     style={{
-                      visibility: `${!screen ? "hidden" : "visible"}`,
+                      display: `${!toggleAudVid.video ? "none" : "block"}`,
                       position: "absolute",
                     }}
                     ref={myVideo}
@@ -106,13 +178,19 @@ const Video = ({
             </div>
           </div>
         </div>
-        {
-          videoStreamArray && videoStreamArray.map((videoStream, i) => {
-            console.log(videoStream.audio)
-            console.log(videoStream.video)
+        {videoStreamArray &&
+          videoStreamArray.map((videoStream, i) => {
             return (
               <div className="col-3 my-3" key={i}>
-                <div className="card" ref={remoteHeader}>
+                <div
+                  className="card"
+                  ref={
+                    remoteHeader
+                    // (element) => {
+                    // remoteHeader.current[i] = element;
+                    // }
+                  }
+                >
                   <div className="card-header">
                     <div className="d-flex align-items-center justify-content-between">
                       <span>{videoStream.name}</span>
@@ -144,14 +222,15 @@ const Video = ({
                       </span>
                     )}
                     <div
-                      style={{
-                        objectFit: "cover",
-                      }}
+                    // style={{
+                    //   objectFit: "cover",
+                    // }}
                     >
                       <video
                         className="w-100"
                         style={{
-                          position: "absolute",
+                          display: `${!videoStream.video ? "none" : "block"}`,
+                          // position: "absolute",
                         }}
                         // id="videoElem"
                         ref={(element) => {
@@ -183,7 +262,7 @@ const Video = ({
       >
         <button
           className={`rounded-circle fs-4 ${
-            !audioSound ? "bg bg-danger" : "bg bg-success"
+            !toggleAudVid.audio ? "bg bg-danger" : "bg bg-success"
           }`}
           onClick={() => {
             audioONOFF();
@@ -193,11 +272,11 @@ const Video = ({
             // audioFun(myVideo.current.srcObject.getTracks()[0].enabled);
           }}
         >
-          {!audioSound ? <BsMicMuteFill /> : <BsMicFill />}
+          {!toggleAudVid.audio ? <BsMicMuteFill /> : <BsMicFill />}
         </button>
         <button
           className={`rounded-circle fs-4 ${
-            !screen ? "bg bg-danger" : "bg bg-success"
+            !toggleAudVid.video ? "bg bg-danger" : "bg bg-success"
           }`}
           onClick={() => {
             // myVideo.current.srcObject.getTracks()[1].enabled =
@@ -208,13 +287,13 @@ const Video = ({
             videoONOFF();
           }}
         >
-          {screen ? <BsCameraVideo /> : <BsCameraVideoOff />}
+          {toggleAudVid.video ? <BsCameraVideo /> : <BsCameraVideoOff />}
         </button>
         {peerIds && (
           <button
             className={`rounded-circle fs-4 ${"bg bg-danger"}`}
             onClick={() => {
-              callEnd();
+              callEndFun();
             }}
           >
             {peerIds && <MdCallEnd />}

@@ -1,6 +1,7 @@
 /*eslint-disable*/
 
 import { useEffect, useRef } from "react";
+// import { useSelector,useDispatch} from "react-redux";
 import {
   BsMicMuteFill,
   BsMicFill,
@@ -9,6 +10,7 @@ import {
   // BsTruckFlatbed,
 } from "react-icons/bs";
 
+import { audioOn, audioOff, videoOff, videoOn,callEnd } from '../redux/toggleSlice'
 const RoomJoin = ({
   info,
   setInfo,
@@ -20,14 +22,17 @@ const RoomJoin = ({
   streamId,
   myVideo,
   joinToRoom,
-  initialVideo
+  initialVideo,
+  toggleAudVid,
+  dispatch
 }) => {
- 
-
+  //  const dispatch = useDispatch()
+  // const toggleAudVid = useSelector((state) => state.toggleSlice);
+  
  function videoONOFF() {
    if (initialVideo.current.srcObject.getVideoTracks()[0].enabled) {
      initialVideo.current.srcObject.getVideoTracks()[0].enabled = false;
-     setScreen(false);
+     dispatch(videoOff({ status: false }));
 
     initialVideo.current.srcObject.getTracks().forEach((tracks) => {
       tracks.stop();
@@ -38,21 +43,21 @@ const RoomJoin = ({
           video: true,
         })
         .then((stream) => {
-          console.log(myVideo);
+          // console.log(myVideo);
           initialVideo.current.srcObject = stream;
         });
-        setScreen(true);
+        dispatch(videoOn({ status: true }));
         // initialVideo.current.srcObject.getVideoTracks()[0].enabled = true;
    }
  }
 
  const audioONOFF = () => {
-   if (audioSound) {
+   if (toggleAudVid.audio) {
    initialVideo.current.srcObject.getAudioTracks()[0].enabled=false;
-     setAudioSound(false);
+     dispatch(audioOff({status:false}))
    } else {
    initialVideo.current.srcObject.getAudioTracks()[0].enabled = true;
-     setAudioSound(true);
+      dispatch(audioOn({status:true}));
    }
  };
 
@@ -72,7 +77,7 @@ const RoomJoin = ({
   
  
   return (
-    <div> 
+    <div>
       <div className=" d-flex justify-content-center ">
         <h1 style={{ marginLeft: "30vw" }}>Live Video App</h1>
       </div>
@@ -98,7 +103,7 @@ const RoomJoin = ({
           >
             <button
               className={`rounded-circle fs-4 ${
-                !audioSound ? "bg bg-danger" : "bg bg-success"
+                !toggleAudVid.audio ? "bg bg-danger" : "bg bg-success"
               }`}
               onClick={() => {
                 audioONOFF();
@@ -108,11 +113,11 @@ const RoomJoin = ({
                 // audioFun(myVideo.current.srcObject.getTracks()[0].enabled);
               }}
             >
-              {!audioSound ? <BsMicMuteFill /> : <BsMicFill />}
-            </button>
+              {!toggleAudVid.audio ? <BsMicMuteFill /> : <BsMicFill />}
+            </button> 
             <button
               className={`rounded-circle fs-4 ${
-                !screen ? "bg bg-danger" : "bg bg-success"
+                !toggleAudVid.video? "bg bg-danger" : "bg bg-success"
               }`}
               onClick={() => {
                 // myVideo.current.srcObject.getTracks()[1].enabled =
@@ -123,9 +128,8 @@ const RoomJoin = ({
                 videoONOFF();
               }}
             >
-              {screen ? <BsCameraVideo /> : <BsCameraVideoOff />}
+              {toggleAudVid.video ? <BsCameraVideo /> : <BsCameraVideoOff />}
             </button>
-            
           </div>
         </div>
         {!streamId && (

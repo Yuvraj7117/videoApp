@@ -18,12 +18,15 @@ io.on("connection", (socket) => {
     // socket.on("userName", ({ userName }) => {
     //   socket.emit("userName", userName);
     // });
-
+  let peerIdVariable;
+  let roomIdVariable;
   socket.on("joinRoom", ({ name, roomId, peerId, video, audio}) => {
-    
+    peerIdVariable = peerId
     console.log(name, "roomId" + roomId, peerId, "video:" + video, "audio:" + audio)  
     // console.log(userName)
     socket.join(roomId)
+    peerIdVariable = peerId
+    roomIdVariable=roomId
     // console.log(userName)
     socket.to(roomId).emit("joined", { roomId, peerId, name, video, audio });
     
@@ -33,12 +36,10 @@ io.on("connection", (socket) => {
     // userName.pop()
   }); 
    
- 
-
-  socket.on("callEnd", ({ roomId, peerIdNo }) => {
+  // socket.on("callEnd", ({ roomId, peerIdNo }) => {
     
-    socket.to(roomId).emit("callEnd", { peerIdNo });
-  });
+  //   socket.to(roomId).emit("callEnd", { peerIdNo });
+  // });
 
 
   socket.on("videoOff", ({ roomId, peerId }) => {
@@ -52,23 +53,25 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("videoOn", peerId)
   })
   
-  socket.on("audioOff", ({ roomId, myId }) => { 
-    console.log(roomId, myId ) 
-    socket.to(roomId).emit("audioOff", myId);
+  socket.on("audioOff", ({ roomId, peerId }) => { 
+    console.log(roomId, peerId ) 
+    socket.to(roomId).emit("audioOff", peerId);
   });
    
-  socket.on("audioOn", ({ roomId, myId }) => {
-    console.log(roomId, myId); 
-   socket.to(roomId).emit("audioOn", myId);
+  socket.on("audioOn", ({ roomId, peerId }) => {
+    console.log(roomId, peerId); 
+   socket.to(roomId).emit("audioOn", peerId);
   })
 
-  socket.on("callEnd", ({ roomId, peerId }) => {
-    console.log(roomId, peerId);
+  socket.on("callEnd", ({ roomId,  peerId }) => {
+    // console.log(roomId, peerId);
     socket.to(roomId).emit("callEnd", peerId);
   });
 
   socket.on("disconnect", () => { 
-    socket.broadcast.emit("callEnded"); 
+      console.log(peerIdVariable)
+    socket.to(roomIdVariable).emit("callDisconnect", peerIdVariable ); 
+    // console.log("first")
   });
 });
   

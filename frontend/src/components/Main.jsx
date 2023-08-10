@@ -5,10 +5,13 @@ import Video from "./Video";
 
 import React, { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
+import { useDispatch, useSelector } from "react-redux";
+import { videoStream } from "../redux/videoSlices";
 
-
+import { joinRoom } from "../redux/roomJoinSlice";
+import { audioOn,audioOff,videoOff,videoOn,callEnd } from "../redux/toggleSlice";
 // https://livevideoapp.onrender.com
-const socket = io("https://livevideoapp.onrender.com");
+const socket = io("http://localhost:7777/");
 
 
 function Main({ myPeer}) {
@@ -40,124 +43,51 @@ function Main({ myPeer}) {
   const remoteVideo = useRef([]);
   // let remoteIcon = document.getElementById("remoteIcon");
   const remoteHeader = useRef(); 
+ 
 
-  const stream = getStreamRef.current;
+  const dispatch = useDispatch()
+  const streamVideo = useSelector(state => state.videoStream.stream)
+  const peerInfo = useSelector((state) => state.roomJoinSlice);
+  const toggleAudVid = useSelector(state => state.toggleSlice)
+  const currentPeerConnection = useRef([]);
 
-  const joinToRoom = (peerId, info) => {
+  // console.log(peerInfo)
+  
+  // const stream = getStreamRef.current;
+
+  const joinToRoom = async(peerId, info) => { 
     const { name, roomId } = info;
     setRoomIdValue(roomId);
-    setMetaData([info]);
-    setCurrentName([...currentName, info.name]);
+     let stream = await getStream();
+     dispatch(videoStream(stream));
+
     if (name && roomId) {
-      setLandingPage(false);
       const { name, roomId } = info;
-      socket.emit("joinRoom", {
-        peerId: peerId,
-        name,
-        roomId,
-        video: screen,
-        audio: audioSound,
-        // userName
-      });
+      const {audio,video}=toggleAudVid
+     dispatch(joinRoom({name,peerId,roomId,landingPage:false,audio,video,socket}))
     }
     initialVideo.current.srcObject.getTracks().forEach((tracks) => {
       tracks.stop();
     });
   };
 
-
   const getStream = () => {
     return new Promise((resolve, reject) => {
       navigator.mediaDevices
-        .getUserMedia({ video: true, audio: true })
+        .getUserMedia({ video: peerInfo.video, audio: peerInfo.audio })
         .then((streams) => {
           resolve(streams);
         });
     });
   }; 
 
-//   const getName = () => {
-//     setInfo((perv)=>[...prev,info])
-//   }
-//  console.log(info)
-
   useEffect(() => {
     if (!isMounted.current) {
       isMounted.current = true;
-      // console.log(getName())
       myPeer.on("open", (id) => {
- 
         setPeersId(id);
       }); 
-// console.log(info.name)
-      async function initiateStream() {
-        let stream = await getStream();
-        setCurrentStream(stream);
 
-        socket.on("joined", (data) => {
-          const { peerId, name, roomId, video, audio } = data;
-          console.log(peerId);
-          setFirstUser(name);
-          // setOtherName([...otherName, name]);
-
-          setPeersId(peerId);
-
-          const call = myPeer.call(peerId, stream, {
-            metadata: { userName: info.name, audio: audio, video: video },
-          });
-
-          let peersList = JSON.parse(JSON.stringify(peers));
-          call.on("stream", (remoteStream) => {
-            console.log(remoteStream);
-            if (!peersList.includes(peerId)) {
-              peersList.push(peerId);
-              setPeers(peersList);
-
-              setStreamId(remoteStream.id);
-              setRoom(call.id);
-              setVideoStreamArray((prev) => [
-                ...prev,
-                { remoteStream, name, audio, video, peerID: peerId },
-              ]);
-              setNameArr((prev) => [...prev, call.metadata.userName]);
-              connectionRef.current = myPeer;
-            }
-          });
-
-          // getStreamRef.current = streamVideo;
-          // socket.emit("stopVideo", { peerId, roomId})
-        });
-
-        myPeer.on("call", (call) => {
-          // console.log("callfghj",call)
-          // myPeer.current.srcObject = getStreamRef.current
-          console.log(stream);
-          call.answer(stream);
-          let peersList = JSON.parse(JSON.stringify(peers));
-          call.on("stream", (remoteStream) => {
-            if (!peersList.includes(call.peer)) {
-              peersList.push(call.peer);
-              setPeers(peersList);
-              setPeerListAnsArray((prev) => [...prev, call.peerConnection]);
-              setVideoStreamArray((prev) => [
-                ...prev,
-                { 
-                  remoteStream,
-                  name: call.metadata.userName,
-                  audio: call.metadata.audio,
-                  video: call.metadata.video,
-                  peerID: call.peer,
-                },
-              ]);
-              setNameArr((prev) => [...prev, call.metadata.userName]);
-              connectionRef.current = myPeer;
-              //  console.log(remoteStream);
-            }
-          });
-        });
-      }
-
-      initiateStream();
     }
   }, []);
 
@@ -165,10 +95,13 @@ function Main({ myPeer}) {
     socket.on("audioOff", (otherPeerId) => {
       let streamArray = JSON.parse(JSON.stringify(videoStreamArray));
       streamArray.forEach((data, index) => {
+        streamArray[index].remoteStream = videoStreamArray[index].remoteStream;
         if (data?.peerID == otherPeerId) {
           streamArray[index].remoteStream =
             videoStreamArray[index].remoteStream;
-          myVideo.current.srcObject.getAudioTracks()[0].enabled = false;
+          // if (streamArray[index].audio = true) {
+          //   myVideo.current.srcObject.getAudioTracks()[0].enabled = false;
+          // }
           streamArray[index].audio = false;
         }
       });
@@ -177,10 +110,20 @@ function Main({ myPeer}) {
     socket.on("audioOn", (otherPeerId) => {
       let streamArray = JSON.parse(JSON.stringify(videoStreamArray));
       streamArray.forEach((data, index) => {
+        streamArray[index].remoteStream = videoStreamArray[index].remoteStream;
         if (data?.peerID == otherPeerId) {
           streamArray[index].remoteStream =
             videoStreamArray[index].remoteStream;
-          myVideo.current.srcObject.getAudioTracks()[0].enabled = true;
+          
+          // if ((streamArray[index].audio = false)) {
+          //   myVideo.current.srcObject.getAudioTracks()[0].enabled = true;
+          // }
+          
+          //  if ((streamArray[index].audio = true)) {
+          //    myVideo.current.srcObject.getAudioTracks()[0].enabled = taskCancelledrue;
+          //  }
+          
+          // myVideo.current.srcObject.getAudioTracks()[0].enabled = true;
           streamArray[index].audio = true;
         }
       });
@@ -189,13 +132,16 @@ function Main({ myPeer}) {
     });
 
     socket.on("videoOff", (otherPeerId) => {
-      console.log(otherPeerId);
+      // console.log(otherPeerId);
+
       let streamArray = JSON.parse(JSON.stringify(videoStreamArray));
       streamArray.forEach((data, index) => {
         streamArray[index].remoteStream = videoStreamArray[index].remoteStream;
         if (data?.peerID == otherPeerId) {
+        
           streamArray[index].video = false;
-          remoteVideo.current[index].style.display = "none";
+          // console.log(streamArray[index]);
+          // remoteVideo.current[index].style.display = "none";
         }
       });
       setVideoStreamArray(streamArray);
@@ -207,81 +153,108 @@ function Main({ myPeer}) {
         streamArray[index].remoteStream = videoStreamArray[index].remoteStream;
         if (data?.peerID == otherPeerId) {
           //  myVideo.current.srcObject.getVideoTracks()[0].enabled = true;
+          console.log(streamArray[index]);
           streamArray[index].video = true;
-          remoteVideo.current[index].style.display = "block";
+          console.log(streamArray[index]);
+          // remoteVideo.current[index].style.display = "block";
         }
       });
       setVideoStreamArray(streamArray);
-    }); 
-
-    socket.on("callEnd", (otherPeerId) => {
-      console.log(otherPeerId);
-      let streamArray = JSON.parse(JSON.stringify(videoStreamArray));
-      streamArray.forEach((data, index) => {
-        streamArray[index].remoteStream = videoStreamArray[index].remoteStream;
-        if (data?.peerID == otherPeerId) {
-          connectionRef.current[index]?.destroy();
-          remoteVideo.current[index]?.remove();
-          remoteHeader.current?.remove();
-          streamArray.splice(index, 1);
-          // socket.off();
-        }
-        console.log(streamArray);
-        setVideoStreamArray(streamArray);
-      });
     });
-  }, [videoStreamArray]);
-
-  useEffect(() => {
-
-    if (videoStreamArray && videoStreamArray.length > 0) {
-      videoStreamArray.map((stream, i) => {
-        remoteVideo.current[i].srcObject = stream.remoteStream;
+    socket.on("callDisconnect", (otherPeerId) => {
+      // console.log(otherPeerId)
+  
+      let streamArray = [...videoStreamArray];
+      videoStreamArray.forEach((data, index) => {
+        // streamArray[index].remoteStream = videoStreamArray[index].remoteStream;
+        if (data?.peerID == otherPeerId) {
+          // connectionRef.current[index]?.destroy();
+          streamArray.splice(index, 1);
+        }
       });
-    }
+      setVideoStreamArray(streamArray);
+   })
+
+ 
+    socket.on("callEnd", (otherPeerId) => {
+            // console.log(otherPeerId);
+
+      let streamArray = [...videoStreamArray];
+      videoStreamArray.forEach((data, index) => {
+        // streamArray[index].remoteStream = videoStreamArray[index].remoteStream;
+        if (data?.peerID == otherPeerId) {
+          // connectionRef.current[index]?.destroy();
+          streamArray.splice(index, 1);
+        }
+      });
+      setVideoStreamArray(streamArray);
+    });
+  }, [videoStreamArray]); 
+
+  
+  useEffect(() => { 
+    // console.log(remoteStream)
+    // if (videoStreamArray && videoStreamArray.length > 0) {
+      videoStreamArray.map((stream, i) => {
+        // console.log(stream)
+        // if( stream.remoteStream !== {}){
+        remoteVideo.current[i].srcObject = stream.remoteStream;
+        // remoteHeader.current[i] = stream
+        // }
+      });
+    // }   
   }, [videoStreamArray]);
 
   const audioONOFF = () => {
     let roomId = roomIdValue;
-    let myId = myPeer.id;
+    let peerId = myPeer.id;
     // let myId = peersId;
-    if (audioSound) {
-      socket.emit("audioOff", { roomId, myId });
-      setAudioSound(false);
-      // myVideo.current.srcObject.getAudioTracks()[0].enabled = false;
+    // console.log("first");
+    if (toggleAudVid.audio) {
+      
+      dispatch(audioOff({roomId, peerId,status:false,socket}))
+      myVideo.current.srcObject.getAudioTracks()[0].enabled = false;
     } else {
-      socket.emit("audioOn", { roomId, myId });
-      setAudioSound(true);
-      // myVideo.current.srcObject.getAudioTracks()[0].enabled = true;
+      dispatch(audioOn({ roomId, peerId, status: true ,socket}));
+      // socket.emit("audioOn", { roomId, myId });
+      // setAudioSound(true);
+      myVideo.current.srcObject.getAudioTracks()[0].enabled = true;
     }
+    //  console.log(toggleAudVid);
   };
 
   function videoONOFF() {
     let roomId = roomIdValue;
     let peerId = myPeer.id;
-    // console.log("MyPeer", myPeer.id)
-    // console.log("OpenPeer", peerId)
-    console.log(myVideo);
+    // console.log(myVideo);
     if (myVideo.current.srcObject.getVideoTracks()[0].enabled) {
-      socket.emit("videoOff", { roomId, peerId });
+      dispatch(videoOff({roomId,peerId,status:false,socket}))
       myVideo.current.srcObject.getVideoTracks()[0].enabled = false;
-      setScreen(false);
+      // setScreen(false);
       const tracks = myVideo.current.srcObject.getVideoTracks();
       tracks.forEach((track) => {
         track.stop();
       });
     } else {
-      socket.emit("videoOn", { roomId, peerId });
+      dispatch(videoOn({roomId, peerId,status:true,socket}));
       navigator.mediaDevices
         .getUserMedia({
           video: true,
         })
         .then((stream) => {
-          console.log(myVideo);
+          // console.log(myVideo);
+          let audioTrack = myVideo.current.srcObject.getAudioTracks()[0];
+          stream.addTrack(audioTrack);  
           myVideo.current.srcObject = stream;
           let vdoTrack = stream.getVideoTracks()[0];
-          setScreen(true);
-          peerListAnsArray.map((RTCPeer) => {
+          // setScreen(true);
+          // console.log("getSenders", currentPeerConnection.current.getSenders());
+          // currentPeerConnection.current.getSenders()
+          //     .find((data) => {
+          //       return data.track.kind == vdoTrack.kind;
+          //     })
+          //     .replaceTrack(vdoTrack);
+          currentPeerConnection.current.map((RTCPeer) => {
             RTCPeer.getSenders()
               .find((data) => {
                 return data.track.kind == vdoTrack.kind;
@@ -291,21 +264,25 @@ function Main({ myPeer}) {
         });
     }
   }
-
-  const callEnd = () => {
+ 
+  const callEndFun = () => {
     let roomId = roomIdValue;
     let peerId = myPeer.id;
-
-    socket.emit("callEnd", { roomId, peerId });
+    // console.log(peerId)
+   dispatch(callEnd({roomId,peerId,socket}))
+    // console.log(roomId,peerId)
+    socket.disconnect();
+    myPeer.disconnect();
     window.location.reload();
   };
+  // console.log(peerInfo.nameArr) 
 
   return (
     <div
       className="container-fluid mt-4 w-100"
       style={{ display: `${streamId ? "block" : "flex"}` }}
     >
-      {landingPage ? (
+      {peerInfo.landingPage ? (
         <RoomJoin
           info={info}
           setInfo={setInfo}
@@ -331,6 +308,8 @@ function Main({ myPeer}) {
           setCurrentName={setCurrentName}
           joinToRoom={joinToRoom}
           initialVideo={initialVideo}
+          toggleAudVid={toggleAudVid}
+          dispatch={dispatch}
           // setUserName={setUserName}
           // userName ={userName}
         />
@@ -350,8 +329,20 @@ function Main({ myPeer}) {
           room={room}
           audioONOFF={audioONOFF}
           videoONOFF={videoONOFF}
-          callEnd={callEnd}
+          callEndFun={callEndFun}
           remoteHeader={remoteHeader}
+          streamVideo={streamVideo}
+          socket={socket}
+          myPeer={myPeer}
+          setVideoStreamArray={setVideoStreamArray}
+          peers={peers}
+          setPeers={setPeers}
+          setPeerListAnsArray={setPeerListAnsArray}
+          connectionRef={connectionRef}
+          toggleAudVid={toggleAudVid}
+          peerInfo={peerInfo}
+          info={info}
+          currentPeerConnection={currentPeerConnection}
         />
       )}
       {/* // (
